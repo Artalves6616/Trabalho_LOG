@@ -3,99 +3,46 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
+# Título da aplicação
+st.title("Análise de Dados Financeiros - LOGG3")
 
-# Carregar dados do arquivo Excel
-caminho = "/Users/arthuralves/Desktop/LOGG_projeto/LOGCP_-_base_tickets_manutencao_historico.xlsx"
-df = pd.read_excel(caminho)
-print(df)
+# Carregar os dados diretamente do arquivo
+file_path = "financeiro_LOGG3.csv"  # Insira o nome do arquivo corretamente se estiver na mesma pasta
+finance_data = pd.read_csv(file_path)
 
-# Selecionar colunas relevantes
-colunas = ["des_assunto", "des_tipo_servico", "des_condominio", "des_status", "dat_criacao", "dat_resolucao", "des_atendimento", "cod_uf", "des_status_etapa"]
-df = df[colunas]
+# Exibir os primeiros dados da planilha
+st.write("Visualizando os primeiros dados da planilha:")
+st.dataframe(finance_data.head())
 
+# Ordenar o período e verificar colunas numéricas
+finance_data['periodo'] = pd.Categorical(finance_data['periodo'], ordered=True)
+finance_data.sort_values('periodo', inplace=True)
+numeric_columns = finance_data.select_dtypes(include=['float64', 'int64']).columns
 
-# Filtrar por status não deletado
-df = df[df["des_status"] != "deleted"]
+# Selecionar a coluna para análise
+selected_columns = st.multiselect("Selecione as colunas para visualização:", numeric_columns)
 
-# Função para gerar gráficos e estatísticas para a UF selecionada
-def gerar_graficos(df, uf):
-    # Filtrar dados para a UF selecionada e converter as datas corretamente
-    df_uf = df[(df["cod_uf"] == uf) & (~df["dat_resolucao"].isnull())]
-    df_uf["dat_criacao"] = pd.to_datetime(df_uf["dat_criacao"], errors="coerce")
-    df_uf["dat_resolucao"] = pd.to_datetime(df_uf["dat_resolucao"], errors="coerce")
-
-    # Remover linhas com datas inválidas (NaT)
-    df_uf = df_uf.dropna(subset=["dat_criacao", "dat_resolucao"])
-
-    # Calcular o tempo de resolução em segundos e converter para horas
-    tempo_resolucao = (df_uf["dat_resolucao"] - df_uf["dat_criacao"]).dt.total_seconds() / 3600
-    media = tempo_resolucao.mean()
-    desvio = tempo_resolucao.std()
-    cv = desvio / media
-
-    # Exibir os resultados
-    st.write(f"*{uf} - Média de tempo de resolução (horas):* {media:.2f}")
-    st.write(f"*{uf} - Desvio padrão de tempo de resolução (horas):* {desvio:.2f}")
-    st.write(f"*{uf} - Coeficiente de variação:* {cv:.2f}")
-
-    # Gerando o histograma do tempo de resolução
-    fig, ax = plt.subplots(figsize=(10, 6))
-    sns.histplot(tempo_resolucao, kde=True, bins=30, color='blue', ax=ax)
-    ax.set_title(f'Distribuição do Tempo de Resolução dos Chamados ({uf})')
-    ax.set_xlabel('Tempo de Resolução (Horas)')
-    ax.set_ylabel('Frequência')
-    ax.grid(True)
-    st.pyplot(fig)
-
-    # Gerando o boxplot do tempo de resolução
-    fig, ax = plt.subplots(figsize=(10, 6))
-    sns.boxplot(x=tempo_resolucao, color='lightblue', ax=ax)
-    ax.set_title(f'Boxplot do Tempo de Resolução dos Chamados ({uf})')
-    ax.set_xlabel('Tempo de Resolução (Horas)')
-    ax.grid(True)
-    st.pyplot(fig)
-
-# Opções de seleção de UF
-ufs_disponiveis = df["cod_uf"].dropna().unique()
-uf_selecionada = st.selectbox("Selecione o Estado (UF):", ufs_disponiveis)
-
-# Gerar gráficos para a UF selecionada
-if uf_selecionada:
-    gerar_graficos(df, uf_selecionada)
-
-# Gráfico de barras com tempo médio de resolução por UF
-st.write("## Tempo Médio de Resolução por UF")
-df["dat_criacao"] = pd.to_datetime(df["dat_criacao"], errors="coerce")
-df["dat_resolucao"] = pd.to_datetime(df["dat_resolucao"], errors="coerce")
-df = df.dropna(subset=["dat_criacao", "dat_resolucao"])
-
-# Calcula o tempo de resolução em horas e agrupa por UF
-df["tempo_resolucao_horas"] = (df["dat_resolucao"] - df["dat_criacao"]).dt.total_seconds() / 3600
-tempo_medio_por_uf = df.groupby("cod_uf")["tempo_resolucao_horas"].mean()
-
-# Gerar gráfico de barras
-fig, ax = plt.subplots(figsize=(12, 6))
-tempo_medio_por_uf.plot(kind='bar', color='skyblue', ax=ax)
-ax.set_title("Tempo Médio de Resolução por UF")
-ax.set_xlabel("UF")
-ax.set_ylabel("Tempo Médio de Resolução (Horas)")
-ax.grid(axis='y')
-st.pyplot(fig)
-
-# Exibir contagem dos serviços mais frequentes (des_assunto)
-st.write("## Tipos de Serviços Realizados Mais Frequentes")
-
-# Calcular os 10 tipos de serviço mais realizados
-top_n = 10  # Define o número de serviços mais frequentes para exibir
-servicos_mais_frequentes = df["des_assunto"].value_counts().nlargest(top_n)
-
-# Gerar gráfico de barras para os serviços mais frequentes
-fig, ax = plt.subplots(figsize=(12, 6))
-servicos_mais_frequentes.plot(kind='bar', color='lightcoral', ax=ax)
-ax.set_title("Top 10 Tipos de Serviços Realizados")
-ax.set_xlabel("Tipo de Serviço")
-ax.set_ylabel("Quantidade")
-ax.grid(axis='y')
-st.pyplot(fig)
-
+# Plotar gráficos
+if selected_columns:
+    for column in selected_columns:
+        fig, ax = plt.subplots()
+        ax.plot(finance_data['periodo'], finance_data[column], marker='o', label=column)
+        ax.set_title(f"Evolução de {column}")
+        ax.set_xlabel("Período")
+        ax.set_ylabel(column)
+        ax.legend()
+        plt.xticks(rotation=45)
+        st.pyplot(fig)
+    
+    # Calcular variação percentual e exibir gráfico
+    if st.checkbox("Mostrar variação percentual"):
+        for column in selected_columns:
+            finance_data[f'{column}_var'] = finance_data[column].pct_change() * 100
+            fig, ax = plt.subplots()
+            ax.bar(finance_data['periodo'], finance_data[f'{column}_var'], color='skyblue')
+            ax.set_title(f"Variação Percentual de {column}")
+            ax.set_xlabel("Período")
+            ax.set_ylabel(f"Variação (%)")
+            plt.xticks(rotation=45)
+            st.pyplot(fig)
 
